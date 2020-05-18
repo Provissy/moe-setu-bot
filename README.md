@@ -7,4 +7,8 @@ A full function setu bot for Telegram.
 
 ## Usage
 Run behind a proxy using:
+
 `proxychains4 python3 main.py`
+
+## License
+The GPL V3 License
