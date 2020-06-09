@@ -9,6 +9,8 @@ from pixivpy3 import *
 from helper import *
 from commands import *
 from state_control import *
+import os
+import json
 
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
@@ -19,7 +21,6 @@ logger.setLevel(logging.DEBUG)
 # updater = Updater(TOKEN,request_kwargs=REQUEST_KWARGS, use_context=True)
 updater = None
 dispatcher = None
-pixiv_api = None
 
 
 # _ Various methods to process received messages.
@@ -41,13 +42,44 @@ def process_command(update, context):
         update.message.reply_text("Not implemented yet!")
 
     elif text.startswith("/pixiv") or text.startswith("pixiv"):
-        command_pixiv(update, context, pixiv_api)
+        command_pixiv(update, context, APIS.pixiv_api)
+
+    elif text.startswith("bash") or text.startswith("/bash"):
+        command_bash(update, context)
+
+    elif text.startswith("grab") or text.startswith("/grab"):
+        command_grab(update, context)
+
+    elif text.startswith("send") or text.startswith("/send"):
+        command_send(update, context)
+
+    elif text.startswith("get-video") or text.startswith("/get-video"):
+        command_get_video(update, context)
+
+    elif text.startswith("set-alias") or text.startswith("/set-alias"):
+        command_set_alias(update, context)
+
+    elif text.startswith("get-alias") or text.startswith("/get-alias"):
+        command_get_alias(update, context)
 
     elif text.startswith("/"):
         update.message.reply_text("Sorry, unknown command, please use /help to list available commands.")
 
+    elif text.startswith("http"):
+        process_link(update,context)
+
     else:
         pass
+
+
+def process_link(update, context):
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!LINK RECEIVED: " + update.message.text)
+    if update.message.text.startswith("https://pixiv.net/artworks/"):
+        illust_id = os.path.basename(update.message.text)
+        json_details = APIS.pixiv_api.illust_detail(illust_id)
+        APIS.pixiv_api.download(url=json_details.illust.image_urls.large, path="img_pixiv")
+        context.bot.send_photo(chat_id=update.effective_chat.id,
+                               photo=open("img_pixiv/" + os.path.basename(json_details.illust.image_urls.large), 'rb'))
 
 
 def process_photo(update, context):
@@ -56,26 +88,31 @@ def process_photo(update, context):
     # Check if the photo is eligible for identifying. If so, process it.
     if update.message.from_user.id in StateControl.list_user_waiting_identify:
         # DO NOT use reply_text, PhotoMessage does not support it.
-        context.bot.send_message(chat_id=update.effective_chat.id, reply_to_message_id=update.message.message_id,
-                                 text="Identifying...\n識別中...\nUID: " + str(update.message.from_user.id))
-        parsed_result = identify_photo(update.message.from_user.id, update.message.photo[0].file_id, context)
+        parsed_result = identify_photo(True, update.message.from_user.id, update.message.photo[0].file_id, context)
         context.bot.send_message(chat_id=update.effective_chat.id, reply_to_message_id=update.message.message_id,  text=parsed_result)
 
 
 def process_reply(update, context):
     print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! REPLY MSG RECEIVED")
-    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IS REPLY TO IS: ", update.message.reply_to_message.message_id)
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IS REPLY TO : ", update.message.reply_to_message.message_id)
     # Check if is replying to a photo
-    if update.message.reply_to_message.photo is not None:
-        if update.message.from_user.id in StateControl.list_user_waiting_identify:
-            update.message.reply_text("Please wait until current operation is done!")
-            return
-
-        StateControl.list_user_waiting_identify.append(update.message.from_user.id)
-        if update.message.text.startswith("identify") or update.message.text.startswith("/identify"):
-            context.bot.send_message(chat_id=update.effective_chat.id, text="Identifying...\n識別中...\nUID: " + str(update.message.from_user.id))
-            parsed_result = identify_photo(update.message.from_user.id, update.message.reply_to_message.photo[0].file_id, context)
+    if hasattr(update.message.reply_to_message, 'photo'):
+        if update.message.text.startswith("identify") or update.message.text.startswith("@moe_setu_bot") or \
+                update.message.text.startswith("/identify"):
+            # StateControl.list_user_waiting_identify.append(update.message.from_user.id)
+            parsed_result = identify_photo(False, update.message.from_user.id, update.message.reply_to_message.photo[0].file_id, context)
             context.bot.send_message(chat_id=update.effective_chat.id, reply_to_message_id=update.message.message_id, text=parsed_result)
+
+    if hasattr(update.message.reply_to_message, 'sticker'):
+        if update.message.text.startswith("get-sticker") or update.message.text is "@moe_setu_bot" or update.message.text.startswith("/get-sticker"):
+            get_stickers(update, context)
+
+    if update.message.text.startswith("create-sticker-set"):
+        create_sticker_set(update, context)
+
+    if update.message.text.startswith("add-sticker") or update.message.text.startswith("add"):
+        add_sticker(update, context)
+
 
 
 
@@ -87,9 +124,11 @@ def main():
     GlobalConst.TOKEN = config['TELEGRAM']['ACCESS_TOKEN']
     GlobalConst.SAUCENAO_API = config['TELEGRAM']['SAUCENAO_API']
     GlobalConst.SAUCENAO_URL = 'https://saucenao.com/search.php?db=999&output_type=2&testmode=1&numres=16&api_key='
+    GlobalConst.TRACEMOE_URL = 'https://trace.moe/api/search?url='
     GlobalConst.PIXIV_USER = config['PIXIV']['USERNAME']
     GlobalConst.PIXIV_PASS = config['PIXIV']['PASSWORD']
     GlobalConst.IMG_SERVER_ADDR = config['MISC']['IMG_SERVER_ADDR']
+    GlobalConst.STICKER_ALIAS = get_json_dict()
     # Notify user to verify the configs.
     print("Your token is: ", GlobalConst.TOKEN)
     print("Your saucenao api is: ", GlobalConst.SAUCENAO_URL)
@@ -99,21 +138,16 @@ def main():
     updater = Updater(GlobalConst.TOKEN, use_context=True)
     global dispatcher
     dispatcher = updater.dispatcher
-    global pixiv_api
-    pixiv_api = AppPixivAPI()
+
+    APIS.pixiv_api = AppPixivAPI()
 
     dispatcher.add_handler(MessageHandler(Filters.reply, process_reply))
     dispatcher.add_handler(MessageHandler(Filters.text,  process_command))
     dispatcher.add_handler(MessageHandler(Filters.photo, process_photo))
 
-
     # Log into Pixiv.
-    pixiv_api.login(GlobalConst.PIXIV_USER, GlobalConst.PIXIV_PASS)
+    APIS.pixiv_api.login(GlobalConst.PIXIV_USER, GlobalConst.PIXIV_PASS)
     print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Logged into pixiv successfully")
-
-    # dispatcher.add_handler(CommandHandler('identify', command_identify))
-
-    print("Starting polling...")
 
     updater.start_polling()
     updater.idle()
