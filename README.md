@@ -18,3 +18,5 @@ Please remove those hardcoded bot names and replace with a name gotten from getM
 
 ## License
 The GPL V3 License
+
+![image](http://www.gnu.org/graphics/gplv3-127x51.png)
