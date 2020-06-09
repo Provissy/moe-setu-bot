@@ -11,5 +11,10 @@ Run behind a proxy:
 
 `proxychains4 python3 main.py`
 
+## Known issue
+This repository is not intended for public release, hence the bot's name is hardcoded. 
+
+Please remove those hardcoded bot names and replace with a name gotten from getMe() api.
+
 ## License
 The GPL V3 License
