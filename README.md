@@ -8,6 +8,7 @@ A setu bot for Telegram.
 
 ### System Dependencies
 * ImageMagick
+* youtube-dl
 * tar
 
 ## Usage
