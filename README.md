@@ -6,6 +6,10 @@ A setu bot for Telegram.
 * [pixivpy](https://github.com/upbit/pixivpy)
 * requests
 
+### System Dependencies
+* ImageMagick
+* tar
+
 ## Usage
 Run behind a proxy:
 
