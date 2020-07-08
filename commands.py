@@ -5,7 +5,7 @@ from time import sleep
 
 from helper import *
 import os
-import main3
+import main
 import requests
 from state_control import StateControl, GlobalConst, APIS
 import pixivpy3
